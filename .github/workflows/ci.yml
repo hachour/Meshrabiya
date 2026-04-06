@@ -39,11 +39,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Clean build directories
+        run: ./gradlew clean --no-daemon
+
       - name: Build with Gradle
-        run: ./gradlew build --no-daemon
+        run: ./gradlew build --no-daemon --stacktrace --no-build-cache
 
       - name: Run unit tests
-        run: ./gradlew test --no-daemon
+        run: ./gradlew test --no-daemon --stacktrace
 
       - name: Generate code coverage report
         run: ./gradlew jacocoTestReport --no-daemon || echo "JaCoCo not configured yet"
@@ -95,7 +98,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run Android lint
-        run: ./gradlew lint --no-daemon
+        run: ./gradlew lint --no-daemon --stacktrace
 
       - name: Run Detekt (Kotlin static analysis)
         run: ./gradlew detekt --no-daemon || echo "Detekt not configured yet"
