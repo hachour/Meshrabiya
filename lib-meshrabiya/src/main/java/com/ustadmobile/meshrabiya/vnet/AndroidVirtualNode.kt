@@ -1,5 +1,65 @@
 package com.ustadmobile.meshrabiya.vnet
 
+/**
+ * Android-specific implementation of [VirtualNode].
+ *
+ * This class provides the Android-specific functionality required for mesh networking,
+ * including WiFi hotspot management, Bluetooth integration, and Android lifecycle awareness.
+ *
+ * ## Features
+ *
+ * - **WiFi Hotspot Management**: Create and manage WiFi Direct Groups and Local Only Hotspots
+ * - **Bluetooth Integration**: Support for BLE-based peer discovery
+ * - **Connection Management**: Automatic handling of WiFi station connections
+ * - **State Persistence**: Uses DataStore to remember network configurations
+ *
+ * ## Requirements
+ *
+ * - Android API 26+ (Android 8.0)
+ * - WiFi hardware
+ * - Optional: Bluetooth for BLE discovery
+ *
+ * ## Permissions Required
+ *
+ * Ensure your AndroidManifest.xml includes:
+ * ```xml
+ * <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+ * <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+ * <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+ * <uses-permission android:name="android.permission.BLUETOOTH" />
+ * <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+ * ```
+ *
+ * ## Usage Example
+ *
+ * ```kotlin
+ * // Create DataStore for settings persistence
+ * val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "meshr_settings")
+ *
+ * // Create the virtual node
+ * val node = AndroidVirtualNode(
+ *     appContext = applicationContext,
+ *     dataStore = applicationContext.dataStore,
+ *     config = NodeConfig.DEFAULT_CONFIG
+ * )
+ *
+ * // Start a hotspot
+ * lifecycleScope.launch {
+ *     val response = node.setWifiHotspotEnabled(
+ *         enabled = true,
+ *         preferredBand = ConnectBand.BAND_5GHZ,
+ *         hotspotType = HotspotType.WIFI_DIRECT
+ *     )
+ *     
+ *     // Get the connect link to share with others
+ *     val connectLink = node.state.first().connectUri
+ * }
+ * ```
+ *
+ * @property appContext The Android application context
+ * @see VirtualNode for the base class
+ */
+
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver

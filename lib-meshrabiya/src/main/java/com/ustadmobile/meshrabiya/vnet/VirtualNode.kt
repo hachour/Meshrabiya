@@ -1,5 +1,15 @@
 package com.ustadmobile.meshrabiya.vnet
 
+/**
+ * Meshrabiya - Android Mesh Networking Library
+ *
+ * Copyright (c) 2024 UstadMobile. All rights reserved.
+ *
+ * This library provides mesh networking capabilities for Android devices using WiFi Direct
+ * and Local Only Hotspots. It enables multi-hop communication between devices without
+ * requiring a WiFi access point.
+ */
+
 import android.util.Log
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
@@ -59,7 +69,15 @@ import java.util.concurrent.atomic.AtomicInteger
 import javax.net.SocketFactory
 import kotlin.random.Random
 
-//Generate a random Automatic Private IP Address
+/**
+ * Generates a random Automatic Private IP Address (APIPA) in the 169.254.x.x range.
+ * 
+ * APIPA addresses are used for link-local communication and are automatically
+ * assigned when no DHCP server is available. In Meshrabiya, each node gets a
+ * unique APIPA address for identification on the virtual mesh network.
+ * 
+ * @return A 32-bit integer representing the APIPA address
+ */
 fun randomApipaAddr(): Int {
     //169.254
     val fixedSection = (169 shl 24).or(254 shl 16)
@@ -69,15 +87,71 @@ fun randomApipaAddr(): Int {
     return fixedSection.or(randomSection)
 }
 
+/**
+ * Creates a random APIPA [InetAddress] for use as a virtual node address.
+ * 
+ * @return An [InetAddress] in the 169.254.x.x range
+ */
 fun randomApipaInetAddr() = InetAddress.getByAddress(randomApipaAddr().addressToByteArray())
 
 /**
- * Mashrabiya Node
+ * VirtualNode is the core abstraction representing a node in the Meshrabiya mesh network.
  *
- * Connection refers to the underlying "real" connection to some other device. There may be multiple
- * connections to the same remote node (e.g. Bluetooth, Sockets running over WiFi, etc)
+ * A VirtualNode provides:
+ * - Virtual IP addressing using APIPA addresses (169.254.x.x)
+ * - Multi-hop routing using BATMAN-style originator message propagation
+ * - TCP socket factory for transparent multi-hop connections
+ * - UDP datagram socket support with broadcast capability
+ * - Integration with WiFi Direct Groups and Local Only Hotspots
  *
- * Addresses are 32 bit integers in the APIPA range
+ * ## Architecture Overview
+ *
+ * The mesh network operates on these principles:
+ * 1. Each node has a virtual IP address and can create/connect to hotspots
+ * 2. Nodes discover each other through originator message broadcasting
+ * 3. Packets are routed hop-by-hop using the chain socket mechanism
+ * 4. Both WiFi Direct Groups and Local Only Hotspots are supported
+ *
+ * ## Connection Types
+ *
+ * Connections refer to the underlying "real" connections to other devices:
+ * - WiFi Direct Groups (supports concurrent STA+P2P on most devices)
+ * - Local Only Hotspots (requires STA+AP concurrency support on Android 11+)
+ * - Bluetooth (for discovery and low-bandwidth fallback)
+ *
+ * ## Addressing
+ *
+ * Addresses are 32-bit integers in the APIPA range (169.254.0.0/16). This avoids
+ * conflicts with common private network ranges and requires no coordination.
+ *
+ * ## Usage Example
+ *
+ * ```kotlin
+ * // Create a virtual node
+ * val node = AndroidVirtualNode(
+ *     appContext = context,
+ *     dataStore = dataStore,
+ *     address = randomApipaInetAddr()
+ * )
+ *
+ * // Create a hotspot for others to connect
+ * node.setWifiHotspotEnabled(enabled = true, preferredBand = ConnectBand.BAND_5GHZ)
+ *
+ * // Use with OkHttp for transparent mesh communication
+ * val client = OkHttpClient.Builder()
+ *     .socketFactory(node.socketFactory)
+ *     .build()
+ * ```
+ *
+ * @property port The port number for the virtual node (0 for auto-assignment)
+ * @property json JSON serializer for mesh control protocol messages
+ * @property logger Logging interface for debug output
+ * @property address The virtual IP address of this node
+ * @property networkPrefixLength The network prefix length (default 16 for APIPA)
+ * @property config Configuration parameters for the node behavior
+ *
+ * @see AndroidVirtualNode for the Android-specific implementation
+ * @see MeshrabiyaConnectLink for connection sharing between nodes
  */
 abstract class VirtualNode(
     val port: Int = 0,
