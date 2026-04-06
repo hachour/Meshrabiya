@@ -35,7 +35,7 @@ import java.util.concurrent.Future
  *                                step a) above.
  */
 class UdpForwardRule(
-    private val boundSocket: DatagramSocket,
+    internal val boundSocket: DatagramSocket,
     private val ioExecutor: ExecutorService,
     private val destAddress: InetAddress,
     private val destPort: Int,
