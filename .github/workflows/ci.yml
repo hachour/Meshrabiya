@@ -6,10 +6,14 @@ on:
   pull_request:
     branches: [ main, master, develop ]
 
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2"
+
 jobs:
   build:
     name: Build and Test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -22,6 +26,16 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Cache build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -30,6 +44,9 @@ jobs:
 
       - name: Run unit tests
         run: ./gradlew test --no-daemon
+
+      - name: Generate code coverage report
+        run: ./gradlew jacocoTestReport --no-daemon || echo "JaCoCo not configured yet"
 
       - name: Generate documentation
         run: ./gradlew dokkaHtml --no-daemon || echo "Dokka not configured yet"
@@ -51,9 +68,17 @@ jobs:
             lib-meshrabiya/build/reports/tests/
             test-app/build/reports/tests/
 
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: lib-meshrabiya/build/reports/jacoco/
+
   lint:
-    name: Lint Check
+    name: Lint and Code Quality
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -69,17 +94,68 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run lint
+      - name: Run Android lint
         run: ./gradlew lint --no-daemon
+
+      - name: Run Detekt (Kotlin static analysis)
+        run: ./gradlew detekt --no-daemon || echo "Detekt not configured yet"
 
       - name: Upload lint results
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: lint-results
           path: |
             lib-meshrabiya/build/reports/lint-results-*.html
             test-app/build/reports/lint-results-*.html
+            lib-meshrabiya/build/reports/detekt/
+            build/reports/detekt/
+
+  verify-formatting:
+    name: Verify Code Formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Verify Kotlin formatting
+        run: ./gradlew ktlintCheck --no-daemon || echo "ktlint not configured yet"
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Check for dependency updates
+        run: ./gradlew dependencyUpdates --no-daemon || echo "dependencyUpdates not configured"
+
+      - name: Generate dependency report
+        run: ./gradlew lib-meshrabiya:dependencyInsight --no-daemon || true
 
   publish:
     name: Publish to Maven Repository

@@ -273,6 +273,17 @@ abstract class VirtualNode(
     override fun nextMmcpMessageId() = mmcpMessageIdAtomic.incrementAndGet()
 
 
+    /**
+     * Allocates a UDP port for virtual datagram socket use.
+     *
+     * If a specific port is requested (portNum > 0) and available, it will be allocated.
+     * Otherwise, a random port is selected from the configured range.
+     *
+     * @param virtualDatagramSocketImpl The socket implementation to associate with
+     * @param portNum The requested port number (0 for random allocation)
+     * @return The allocated port number
+     * @throws IllegalStateException if no port can be allocated
+     */
     override fun allocateUdpPortOrThrow(
         virtualDatagramSocketImpl: VirtualDatagramSocketImpl,
         portNum: Int
@@ -286,18 +297,26 @@ abstract class VirtualNode(
             return portNum
         }
 
+        // Use configured port range instead of hardcoded values
+        val portStart = config.portRangeStart
+        val portEnd = config.portRangeEnd
+        val maxAttempts = config.portAllocationMaxAttempts
+
         var attemptCount = 0
         do {
-            val randomPort = Random.nextInt(0, Short.MAX_VALUE.toInt())
+            val randomPort = Random.nextInt(portStart, portEnd)
             if(!activeSockets.containsKey(randomPort)) {
                 activeSockets[randomPort] = virtualDatagramSocketImpl
                 return randomPort
             }
 
             attemptCount++
-        }while(attemptCount < 100)
+        } while (attemptCount < maxAttempts)
 
-        throw IllegalStateException("Could not allocate random free port")
+        throw IllegalStateException(
+            "Could not allocate random free port after $maxAttempts attempts. " +
+            "Active sockets: ${activeSockets.size}"
+        )
     }
 
     override fun deallocatePort(protocol: Protocol, portNum: Int) {
@@ -355,18 +374,60 @@ abstract class VirtualNode(
         return boundPort
     }
 
+    /**
+     * Stop a UDP forwarding rule that was bound by zone.
+     *
+     * @param bindZone The zone (VNET or REAL) where the socket is bound
+     * @param bindPort The port number to stop forwarding on
+     * @return true if a forwarding rule was found and removed, false otherwise
+     */
     fun stopForward(
         bindZone: Zone,
         bindPort: Int
-    ) {
-
+    ): Boolean {
+        val key = ForwardBindPoint(null, bindZone, bindPort)
+        val rule = forwardingRules.remove(key)
+        return if (rule != null) {
+            try {
+                rule.boundSocket.close()
+                logger(Log.INFO, "$logPrefix: stopForward: Stopped forwarding rule for $bindZone:$bindPort")
+                true
+            } catch (e: Exception) {
+                logger(Log.WARN, "$logPrefix: stopForward: Error closing socket for $bindZone:$bindPort", e)
+                false
+            }
+        } else {
+            logger(Log.DEBUG, "$logPrefix: stopForward: No forwarding rule found for $bindZone:$bindPort")
+            false
+        }
     }
 
+    /**
+     * Stop a UDP forwarding rule that was bound by address.
+     *
+     * @param bindAddr The address where the socket is bound
+     * @param bindPort The port number to stop forwarding on
+     * @return true if a forwarding rule was found and removed, false otherwise
+     */
     fun stopForward(
         bindAddr: InetAddress,
         bindPort: Int,
-    ) {
-
+    ): Boolean {
+        val key = ForwardBindPoint(bindAddr, null, bindPort)
+        val rule = forwardingRules.remove(key)
+        return if (rule != null) {
+            try {
+                rule.boundSocket.close()
+                logger(Log.INFO, "$logPrefix: stopForward: Stopped forwarding rule for ${bindAddr.hostAddress}:$bindPort")
+                true
+            } catch (e: Exception) {
+                logger(Log.WARN, "$logPrefix: stopForward: Error closing socket for ${bindAddr.hostAddress}:$bindPort", e)
+                false
+            }
+        } else {
+            logger(Log.DEBUG, "$logPrefix: stopForward: No forwarding rule found for ${bindAddr.hostAddress}:$bindPort")
+            false
+        }
     }
 
     private fun createForwardRule(
@@ -498,6 +559,21 @@ abstract class VirtualNode(
     }
 
 
+    /**
+     * Routes a virtual packet to its destination.
+     *
+     * This method handles both unicast and broadcast packets. For unicast
+     * packets, it looks up the next hop using the originator message table.
+     * For broadcast packets, it forwards to all neighbors except the sender.
+     *
+     * Important: This method catches and logs all exceptions to prevent
+     * the routing loop from crashing. Failed routing attempts are logged
+     * but do not propagate exceptions.
+     *
+     * @param packet The virtual packet to route
+     * @param datagramPacket The underlying datagram packet (if available)
+     * @param virtualNodeDatagramSocket The socket to use for forwarding
+     */
     override fun route(
         packet: VirtualPacket,
         datagramPacket: DatagramPacket?,
@@ -548,22 +624,36 @@ abstract class VirtualNode(
                             }
                         )
 
-                        it.second.receivedFromSocket.send(
-                            nextHopAddress = it.second.lastHopRealInetAddr,
-                            nextHopPort = it.second.lastHopRealPort,
-                            virtualPacket = packet,
-                        )
+                        try {
+                            it.second.receivedFromSocket.send(
+                                nextHopAddress = it.second.lastHopRealInetAddr,
+                                nextHopPort = it.second.lastHopRealPort,
+                                virtualPacket = packet,
+                            )
+                        } catch (e: Exception) {
+                            logger(Log.WARN,
+                                "$logPrefix Failed to broadcast to ${it.first.addressToDotNotation()}",
+                                e
+                            )
+                        }
                     }
 
                 }else {
                     val originatorMessage = originatingMessageManager
                         .findOriginatingMessageFor(packet.header.toAddr)
                     if(originatorMessage != null) {
-                        originatorMessage.receivedFromSocket.send(
-                            nextHopAddress = originatorMessage.lastHopRealInetAddr,
-                            nextHopPort = originatorMessage.lastHopRealPort,
-                            virtualPacket = packet
-                        )
+                        try {
+                            originatorMessage.receivedFromSocket.send(
+                                nextHopAddress = originatorMessage.lastHopRealInetAddr,
+                                nextHopPort = originatorMessage.lastHopRealPort,
+                                virtualPacket = packet
+                            )
+                        } catch (e: Exception) {
+                            logger(Log.WARN,
+                                "$logPrefix Failed to send to next hop ${originatorMessage.lastHopRealInetAddr.hostAddress}",
+                                e
+                            )
+                        }
                     }else {
                         logger(Log.WARN, "$logPrefix route: Cannot route packet to " +
                                 "${packet.header.toAddr.addressToDotNotation()} : no known nexthop")
@@ -571,11 +661,12 @@ abstract class VirtualNode(
                 }
             }
         }catch(e: Exception) {
+            // Log but do not re-throw - this prevents the routing loop from crashing
+            // due to a single packet processing error
             logger(Log.ERROR,
                 "$logPrefix : route : exception routing packet from ${packet.header.fromAddr.addressToDotNotation()}",
                 e
             )
-            throw e
         }
     }
 

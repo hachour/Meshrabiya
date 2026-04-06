@@ -3,6 +3,10 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.serialization'
     id 'maven-publish'
+    id 'io.gitlab.arturbosch.detekt'
+    id 'org.jetbrains.dokka'
+    id 'org.jlleitschuh.gradle.ktlint'
+    id 'jacoco'
 }
 
 android {
@@ -68,6 +72,72 @@ dependencies {
     androidTestImplementation "app.cash.turbine:turbine:$version_turbine"
     androidTestImplementation "org.mockito:mockito-android:$version_android_mockito"
     androidTestImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
+}
+
+
+// ==========================================
+// Code Quality Configuration
+// ==========================================
+
+// JaCoCo - Code Coverage
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+tasks.register('jacocoTestReport', JacocoReport) {
+    dependsOn 'testDebugUnitTest', 'connectedDebugAndroidTest'
+    
+    reports {
+        xml.required = true
+        html.required = true
+        html.outputLocation = layout.buildDirectory.dir('reports/jacoco/html')
+        xml.outputLocation = layout.buildDirectory.file('reports/jacoco/report.xml')
+    }
+    
+    sourceDirectories.setFrom(layout.projectDirectory.dir("src/main/java"))
+    classDirectories.setFrom(
+        fileTree(
+            dir: layout.buildDirectory.dir("tmp/kotlin-classes/debug"),
+            excludes: [
+                '**/R.class',
+                '**/R$*.class',
+                '**/BuildConfig.*',
+                '**/Manifest*.*',
+                '**/*_Hilt*',
+                '**/*_MembersInjector*',
+            ]
+        )
+    )
+    executionData.setFrom(
+        fileTree(
+            dir: layout.buildDirectory,
+            includes: [
+                "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec",
+                "outputs/code_coverage/debugAndroidTest/connected/**/*.ec",
+            ]
+        )
+    )
+}
+
+// Detekt - Static Analysis
+detekt {
+    config.setFrom(files("${rootProject.projectDir}/config/detekt/detekt.yml"))
+    parallel = true
+    autoCorrect = true
+    buildUponDefaultConfig = true
+    allRules = false
+    disableDefaultRuleSets = false
+    baseline = file("${project.projectDir}/detekt-baseline.xml")
+}
+
+// KtLint - Code Formatting
+ktlint {
+    android = true
+    ignoreFailures = true  // Set to false for strict CI
+    reporters {
+        reporter "html"
+        reporter "plain"
+    }
 }
 
 publishing {

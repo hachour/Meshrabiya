@@ -1,0 +1,137 @@
+# Detekt configuration for Meshrabiya
+# Detekt is a static code analysis tool for Kotlin
+
+build:
+  maxIssues: 0
+  weights:
+    complexity: 2
+    formatting: 1
+    LongParameterList: 1
+    comments: 1
+
+complexity:
+  active: true
+  LongMethod:
+    active: true
+    threshold: 60
+  LongParameterList:
+    active: true
+    functionThreshold: 6
+    constructorThreshold: 8
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 15
+    thresholdInClasses: 15
+    thresholdInInterfaces: 10
+  ComplexCondition:
+    active: true
+    threshold: 4
+  LargeClass:
+    active: true
+    threshold: 200
+  NestedBlockDepth:
+    active: true
+    threshold: 4
+
+style:
+  active: true
+  MagicNumber:
+    active: false # We use constants in NodeConfig now
+  UnusedPrivateMember:
+    active: true
+  ReturnCount:
+    active: true
+    max: 3
+  MaxLineLength:
+    active: true
+    maxLineLength: 120
+  WildcardImport:
+    active: true
+  ThrowsCount:
+    active: true
+    max: 3
+  LoopWithTooManyJumpStatements:
+    active: true
+    maxStepCount: 2
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    active: false # We need to catch broad exceptions in routing
+  NotImplementedDeclaration:
+    active: true
+  InstanceOfCheckForException:
+    active: true
+
+performance:
+  active: true
+  ArrayPrimitive:
+    active: true
+  ForEachOnRange:
+    active: true
+  SpreadOperator:
+    active: false
+
+potential-bugs:
+  active: true
+  MissingWhenCase:
+    active: true
+  UnsafeCallOnNullableType:
+    active: true
+  UnsafeCast:
+    active: true
+  UselessPostfixExpression:
+    active: true
+
+coroutines:
+  active: true
+  GlobalCoroutineUsage:
+    active: true
+  RedundantSuspendModifier:
+    active: true
+  SleepInsteadOfDelay:
+    active: true
+
+formatting:
+  active: true
+  autoCorrect: false
+  FinalNewline:
+    active: true
+  ImportOrdering:
+    active: true
+  Indentation:
+    active: true
+    indentSize: 4
+  NoTrailingSpaces:
+    active: true
+  NoMultipleSpaces:
+    active: true
+  Filename:
+    active: true
+
+naming:
+  active: true
+  ClassNaming:
+    active: true
+    classPattern: '[A-Z][a-zA-Z0-9]*'
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-z][a-zA-Z0-9]*'
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Z][_A-Z0-9]*'
+    variablePattern: '[a-z][A-Za-z]*'
+  PackageNaming:
+    active: true
+    packagePattern: '[a-z]+(\.[a-z][a-z0-9]*)*'
+
+comments:
+  active: true
+  CommentOverPrivateFunction:
+    active: false
+  CommentOverPrivateProperty:
+    active: false
+  UndocumentedPublicClass:
+    active: false # Would be nice but gradual adoption
+  UndocumentedPublicFunction:
+    active: false
