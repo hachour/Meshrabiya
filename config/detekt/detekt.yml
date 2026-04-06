@@ -5,7 +5,6 @@ build:
   maxIssues: 0
   weights:
     complexity: 2
-    formatting: 1
     LongParameterList: 1
     comments: 1
 
@@ -52,7 +51,7 @@ style:
     max: 3
   LoopWithTooManyJumpStatements:
     active: true
-    maxStepCount: 2
+    maxJumpCount: 2
 
 exceptions:
   active: true
@@ -74,8 +73,6 @@ performance:
 
 potential-bugs:
   active: true
-  MissingWhenCase:
-    active: true
   UnsafeCallOnNullableType:
     active: true
   UnsafeCast:
@@ -92,23 +89,6 @@ coroutines:
   SleepInsteadOfDelay:
     active: true
 
-formatting:
-  active: true
-  autoCorrect: false
-  FinalNewline:
-    active: true
-  ImportOrdering:
-    active: true
-  Indentation:
-    active: true
-    indentSize: 4
-  NoTrailingSpaces:
-    active: true
-  NoMultipleSpaces:
-    active: true
-  Filename:
-    active: true
-
 naming:
   active: true
   ClassNaming:
@@ -120,7 +100,7 @@ naming:
   TopLevelPropertyNaming:
     active: true
     constantPattern: '[A-Z][_A-Z0-9]*'
-    variablePattern: '[a-z][A-Za-z]*'
+    propertyPattern: '[a-z][A-Za-z0-9]*'
   PackageNaming:
     active: true
     packagePattern: '[a-z]+(\.[a-z][a-z0-9]*)*'
