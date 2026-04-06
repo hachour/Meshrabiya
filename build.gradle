@@ -15,6 +15,11 @@ plugins {
 
 ext.buildConfigProperties = new Properties()
 
+// Set default values for CI environment (will be overridden if buildconfig.local.properties exists)
+ext.buildConfigProperties.setProperty("android.acra.url", "")
+ext.buildConfigProperties.setProperty("android.acra.user", "")
+ext.buildConfigProperties.setProperty("android.acra.auth", "")
+
 if(project.file("buildconfig.local.properties").exists()) {
     ext.buildConfigProperties.load(new FileInputStream(project.file("buildconfig.local.properties")))
 }

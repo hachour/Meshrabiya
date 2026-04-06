@@ -128,7 +128,10 @@ detekt {
     buildUponDefaultConfig = true
     allRules = false
     disableDefaultRuleSets = false
-    baseline = file("${project.projectDir}/detekt-baseline.xml")
+    // Baseline file is optional - only used if it exists
+    if(file("${project.projectDir}/detekt-baseline.xml").exists()) {
+        baseline = file("${project.projectDir}/detekt-baseline.xml")
+    }
 }
 
 // KtLint - Code Formatting
