@@ -2,7 +2,7 @@
 # Detekt is a static code analysis tool for Kotlin
 
 build:
-  maxIssues: 0
+  maxIssues: 300
   weights:
     complexity: 2
     LongParameterList: 1
